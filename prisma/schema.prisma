@@ -1,0 +1,156 @@
+// Prisma schema for the Period Tracker backend.
+// This is the ONLY place the application talks to PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Flow {
+  LIGHT
+  MEDIUM
+  HEAVY
+  VERY_HEAVY
+}
+
+enum SymptomType {
+  CRAMPS
+  HEADACHE
+  BLOATING
+  ACNE
+  FATIGUE
+  BACK_PAIN
+  MOOD_CHANGES
+  BREAST_TENDERNESS
+  NAUSEA
+  OTHER
+}
+
+enum Severity {
+  MILD
+  MODERATE
+  SEVERE
+}
+
+enum Mood {
+  HAPPY
+  CALM
+  ENERGETIC
+  NEUTRAL
+  SAD
+  IRRITATED
+  ANXIOUS
+  TIRED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String
+  dateOfBirth  DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  periods            Period[]
+  symptoms           SymptomLog[]
+  moods              MoodLog[]
+  sessions           Session[]
+  passwordResets     PasswordResetToken[]
+  reminderPreference ReminderPreference?
+
+  @@index([email])
+}
+
+model Period {
+  id        String   @id @default(uuid())
+  userId    String
+  startDate DateTime
+  endDate   DateTime?
+  flow      Flow     @default(MEDIUM)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, startDate])
+}
+
+model SymptomLog {
+  id        String      @id @default(uuid())
+  userId    String
+  date      DateTime
+  type      SymptomType
+  severity  Severity    @default(MODERATE)
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+model MoodLog {
+  id        String   @id @default(uuid())
+  userId    String
+  date      DateTime
+  mood      Mood
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+model ReminderPreference {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  periodReminder        Boolean  @default(true)
+  periodReminderDaysBefore Int   @default(2)
+  symptomReminder       Boolean  @default(false)
+  reminderTime          String   @default("09:00") // 24h HH:mm, interpreted in the user's local time
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Hashed refresh tokens. The raw token only ever lives in the client's httpOnly cookie.
+model Session {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  userAgent  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
